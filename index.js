@@ -73,9 +73,7 @@ export default class extends Component {
 
     static defaultProps = {
         keyboardOffset: 40,
-        multilineInputStyle: {
-          //fontSize: 17
-        },
+        multilineInputStyle: null,
         useAnimatedScrollView: false,
     };
 
@@ -122,7 +120,7 @@ export default class extends Component {
         const ScrollComponent = useAnimatedScrollView ? Animated.ScrollView : ScrollView;
 
         return (
-            <KeyboardAvoidingView behavior={isIOS ? 'padding' : null}>
+            <KeyboardAvoidingView behavior={isIOS ? 'padding' : null} >
                 <View style={styles.wrap}>
                     <ScrollComponent ref={this._onRef}
                                      onMomentumScrollEnd={this._onMomentumScrollEnd}
@@ -292,28 +290,24 @@ export default class extends Component {
             (isAncestor) => {
                 if (!isAncestor) return;
 
-                UIManager.measure(curFocusTarget, (originX, originY, width, height, pageX, pageY) => {
-                  const { text, selectionEnd} = this._getInputInfo(curFocusTarget);
-                  const cursorAtLastLine = !text ||
-                      selectionEnd === undefined ||
-                      text.length === selectionEnd;
+                const { text, selectionEnd, width, height } = this._getInputInfo(curFocusTarget);
+                const cursorAtLastLine = !text ||
+                    selectionEnd === undefined ||
+                    text.length === selectionEnd;
 
-                  if (cursorAtLastLine) {
-                      return this._scrollToKeyboard(curFocusTarget, 0);
-                  }
-
-                  this._measureCursorPosition(
-                      text.substr(0, selectionEnd),
-                      width,
-                      cursorRelativeTopOffset => {
-                          this._scrollToKeyboard(
-                              curFocusTarget,
-                              Math.max(0, height - cursorRelativeTopOffset)
-                          );
-                      }
-                  );
-                })
-
+                if (cursorAtLastLine) {
+                    return this._scrollToKeyboard(curFocusTarget, 0);
+                }
+                this._measureCursorPosition(
+                    text.substr(0, selectionEnd),
+                    width,
+                    cursorRelativeTopOffset => {
+                        this._scrollToKeyboard(
+                            curFocusTarget,
+                            Math.max(0, height - cursorRelativeTopOffset)
+                        );
+                    }
+                );
             }
         );
     };
@@ -372,11 +366,8 @@ export default class extends Component {
 
         if (multiline) {
             if (inputInfo.text === undefined) {
-                if(getProps(event._targetInst).value !== undefined){
-                  inputInfo.text = getProps(event._targetInst).value;
-                }else if(getProps(event._targetInst).defaultValue !== undefined){
-                    inputInfo.text = getProps(event._targetInst).defaultValue;
-                }
+                const props = getProps(event._targetInst);
+                inputInfo.text = props.value || props.defaultValue;
             }
 
             if (!isIOS) return;
@@ -424,16 +415,17 @@ export default class extends Component {
     // 使用防抖函数有两个目的
     // - 确保 scrollToKeyboardRequest 在 onSelectionChange 之后执行
     // - 短时间内不会重复执行 onContentSizeChange，因为当一次粘贴进许多行文本时，可能会连续触发多次 onContentSizeChange
-    _onContentSizeChange = debounce(({ ...event }) => {
+    _onContentSizeChange = ({ ...event }) => {
         const target = event.target || event.currentTarget;
         const inputInfo = this._getInputInfo(target);
         inputInfo.width = event.nativeEvent.contentSize.width;
         inputInfo.height = event.nativeEvent.contentSize.height;
+        let time = new Date();
         if (inputInfo.text === undefined) {
             inputInfo.text = getProps(event._targetInst).value;
         }
         this._scrollToKeyboardRequest(true);
-    }, 2);
+    };
 }
 
 function getProps(targetNode) {
